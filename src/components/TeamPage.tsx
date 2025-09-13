@@ -18,7 +18,6 @@ import { Button } from "@/components/ui/Button";
 import TeamCalendar from "./TeamCalendar";
 import KanbanBoard from "@/components/KanbanBoard";
 
-
 interface Task {
   id: string;
   title: string;
@@ -609,6 +608,7 @@ export default function TeamPage({ team, onBack }: TeamPageProps) {
         {/* Team Members */}
         <div className="pb-6">
           <TeamMembers
+            teamId={team.id}
             members={members}
             onAddMember={handleAddMember}
             isLoading={isLoadingMembers}

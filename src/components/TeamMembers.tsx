@@ -12,6 +12,15 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Bagde";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/Dialog";
+
+import QRCodeDisplay from "./QRCodeDisplay";
 
 interface TeamMember {
   id: string;
@@ -26,16 +35,19 @@ interface TeamMembersProps {
   members: TeamMember[];
   onAddMember: (email: string) => Promise<void>;
   isLoading?: boolean;
+  teamId: string;
   canAddMembers?: boolean;
 }
 
 export default function TeamMembers({
   members,
+  teamId,
   onAddMember,
   isLoading = false,
   canAddMembers = false,
 }: TeamMembersProps) {
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -121,24 +133,67 @@ export default function TeamMembers({
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <User className="h-6 w-6 text-primary" />
-          <h2 className="text-xl font-semibold text-foreground">
-            Team Members
-          </h2>
+          Team Members
           <span className="bg-muted text-muted-foreground px-2 py-1 rounded-full text-sm">
             {members.length}
           </span>
         </div>
-        {canAddMembers && (
+        <div className="flex gap-2">
+          {canAddMembers && (
+            <Button
+              variant="default"
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="flex items-center gap-2"
+            >
+              <UserPlus className="h-4 w-4" />
+              Add Member
+            </Button>
+          )}
           <Button
-            variant="default"
-            onClick={() => setShowAddForm(!showAddForm)}
+            variant="outline"
+            onClick={() => setShowShareModal(true)}
             className="flex items-center gap-2"
           >
-            <UserPlus className="h-4 w-4" />
-            Add Member
+            {/* You can use a share icon from lucide-react or similar */}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 12v.01M12 4v.01M20 12v.01M12 20v.01M8.59 16.59L12 20l3.41-3.41M16.59 8.59L20 12l-3.41 3.41M8.59 7.41L12 4l3.41 3.41"
+              />
+            </svg>
+            Share Team
           </Button>
-        )}
+        </div>
       </div>
+      {/* Share Team Modal */}
+      <Dialog open={showShareModal} onOpenChange={setShowShareModal}>
+        <DialogContent className="h-[70vh] !max-w-none w-[40vw]">
+          <DialogHeader>
+            <DialogTitle>Share Team</DialogTitle>
+            <DialogDescription>
+              Scan this QR code to join the team.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center py-6">
+            <div className="w-full h-full flex items-center justify-center rounded-lg">
+              <QRCodeDisplay
+                value={`${
+                  typeof window !== "undefined" ? window.location.origin : ""
+                }/join-team?teamId=${teamId || "team-id"}`}
+                size={400}
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {showAddForm && (
         <div className="mb-6 rounded-lg pt-2">
