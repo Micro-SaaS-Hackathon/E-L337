@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import TeamCalendar from "./TeamCalendar";
+import KanbanBoard from "@/components/KanbanBoard";
+
 
 interface Task {
   id: string;
@@ -551,13 +553,29 @@ export default function TeamPage({ team, onBack }: TeamPageProps) {
         {/* Kanban Board */}
         <div className="mb-8 w-full">
           {isLoadingTasks ? (
-<div>
-    // Loading state for tasks
-</div>
+            <div className="bg-card rounded-lg shadow-sm border border-muted p-8">
+              <div className="animate-pulse flex gap-6">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex-1 w-full">
+                    <div className="h-6 bg-muted rounded w-24 mb-4"></div>
+                    <div className="space-y-3">
+                      {[1, 2].map((j) => (
+                        <div key={j} className="h-24 bg-muted rounded"></div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : (
-<div>
-// Place for kanban board. 
-</div>
+            <KanbanBoard
+              tasks={tasks}
+              onTaskUpdate={handleTaskUpdate}
+              onTaskStatusChange={handleTaskStatusChange}
+              generatingTasks={generatingTasks}
+              showSkeletonCard={showSkeletonCard}
+              teamId={team.id}
+            />
           )}
         </div>
 
