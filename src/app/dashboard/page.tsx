@@ -6,6 +6,8 @@ import { useEffect } from "react";
 import { LogOut, LucideMoveLeft } from "lucide-react";
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/Button";
+import TeamManagement from "@/components/TeamManagement";
+
 
 export default function Dashboard() {
   const { user, loading, signOut } = useAuth();
@@ -43,6 +45,10 @@ export default function Dashboard() {
       </div>
       <div className="min-h-screen p-8 bg-background">
         <div className="max-w-6xl mx-auto">
+<div className="mb-3">
+            <TeamManagement />
+        </div>
+
           {/* User Info Section */}
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             <div className="bg-card p-6 rounded-lg shadow-md">
