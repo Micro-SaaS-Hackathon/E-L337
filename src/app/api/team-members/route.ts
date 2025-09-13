@@ -36,10 +36,6 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
-    if (membershipError || !membership) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
-
     // Get team members
     const { data: teamMembers, error: membersError } = await supabase
       .from('team_members')
@@ -105,7 +101,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify user is an admin or owner of the team
+    // Verify user is an admin/owner OR is adding themselves
     const { data: membership, error: membershipError } = await supabase
       .from('team_members')
       .select('role')
@@ -113,8 +109,11 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
-    if (membershipError || !membership || !['admin', 'owner'].includes(membership.role)) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    // Only require admin/owner if adding someone else
+    if (user.email !== email) {
+      if (membershipError || !membership || !['admin', 'owner'].includes(membership.role)) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
     }
 
     // Find the user by email
