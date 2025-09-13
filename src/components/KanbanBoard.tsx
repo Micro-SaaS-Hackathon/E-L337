@@ -213,7 +213,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
             ) : (
               <>
                 <Sparkles className="h-3 w-3 mr-1" />
-                AI Generate
+                AI Generate Subtasks
               </>
             )}
           </Button>
@@ -385,7 +385,9 @@ export default function KanbanBoard({
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [subtasksMap, setSubtasksMap] = useState<Record<string, Subtask[]>>({});
-  const [generatingSubtasksTaskId, setGeneratingSubtasksTaskId] = useState<string | null>(null);
+  const [generatingSubtasksTaskId, setGeneratingSubtasksTaskId] = useState<
+    string | null
+  >(null);
   // Local created tasks (so UI updates without parent refetch)
   const [createdTasks, setCreatedTasks] = useState<Task[]>([]);
   // Add Task modal for To Do
@@ -396,9 +398,25 @@ export default function KanbanBoard({
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string>("");
   // New fields for role
-  const roleOptions = ["frontend", "backend", "fullstack", "devops", "design", "qa", "product"];
+  const roleOptions = [
+    "frontend",
+    "backend",
+    "fullstack",
+    "devops",
+    "design",
+    "qa",
+    "product",
+  ];
   const [newRole, setNewRole] = useState<string>("");
-  const [teamMembers, setTeamMembers] = useState<Array<{ id: string; name: string; email: string; role: string; field: string }>>([]);
+  const [teamMembers, setTeamMembers] = useState<
+    Array<{
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+      field: string;
+    }>
+  >([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   // Edit state for In Progress tasks
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -420,15 +438,15 @@ export default function KanbanBoard({
         });
         if (res.ok) {
           const data = await res.json();
-            setTeamMembers(
-              (data.members || []).map((m: any) => ({
-                id: m.id,
-                name: m.name,
-                email: m.email,
-                role: m.role,
-                field: m.field,
-              }))
-            );
+          setTeamMembers(
+            (data.members || []).map((m: any) => ({
+              id: m.id,
+              name: m.name,
+              email: m.email,
+              role: m.role,
+              field: m.field,
+            }))
+          );
         }
       } catch (e) {
         console.error("Failed to load team members", e);
@@ -813,7 +831,9 @@ export default function KanbanBoard({
                             </div>
                             <div className="grid grid-cols-1 gap-3">
                               <div>
-                                <label className="text-sm text-muted-foreground">Role / Category</label>
+                                <label className="text-sm text-muted-foreground">
+                                  Role / Category
+                                </label>
                                 <select
                                   className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
                                   value={newRole}
@@ -949,9 +969,9 @@ export default function KanbanBoard({
       {selectedTask && (
         <TaskModal
           task={selectedTask}
-            isOpen={isModalOpen}
-            onClose={closeModal}
-            onTaskUpdate={onTaskUpdate}
+          isOpen={isModalOpen}
+          onClose={closeModal}
+          onTaskUpdate={onTaskUpdate}
         />
       )}
     </div>
