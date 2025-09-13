@@ -61,13 +61,16 @@ export async function POST(request: NextRequest) {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 const prompt = `
-You are an expert project manager. Break down this task into specific, actionable subtasks:
+You are an expert project manager. Break down this task into specific, actionable subtasks that follow a LOGICAL SEQUENTIAL ORDER:
 
 Task Title: "${task.title}"
 Task Description: "${task.description || 'No description provided'}"
 
-CRITICAL REQUIREMENT - JUSTIFICATION FOR EVERY SUBTASK:
-Every subtask you create must have a clear, logical reason and purpose. You must ensure that:
+CRITICAL REQUIREMENTS:
+
+1. SEQUENTIAL ORDER: Create subtasks that follow a logical step-by-step progression where each subtask naturally leads to the next. The subtasks should be ordered so that completing them in sequence makes the most sense for project workflow.
+
+2. JUSTIFICATION FOR EVERY SUBTASK: Every subtask you create must have a clear, logical reason and purpose. You must ensure that:
 - Each subtask directly contributes to completing the main task with a specific purpose
 - Every subtask is necessary and not just "nice to have" - it must be essential for the task completion
 - The approach and implementation details you suggest have justified reasons for being included
@@ -78,8 +81,10 @@ Create the appropriate number of specific subtasks needed to complete this main 
 - Focused on one clear deliverable or action
 - Something that can be completed and checked off
 - More detailed than the main task
-- Designed to be worked on independently by different team members without blocking or interfering with each other
-- Structured to allow parallel work while collectively achieving the parent task goal
+- Ordered in a logical sequence that represents the natural workflow progression
+- Structured so that deadlines can be assigned sequentially (first subtask has earliest deadline, last subtask has latest deadline)
+
+IMPORTANT: List the subtasks in the order they should logically be completed. The first subtask in your array should be the first thing that needs to be done, and the last subtask should be the final step.
 
 Ensure subtasks are decomposed so that multiple team members can work simultaneously on different aspects of the same goal without dependencies or conflicts. Generate as many or as few subtasks as needed based on the complexity and scope of the main task.
 
@@ -159,9 +164,17 @@ Return only the JSON array, no additional text.
           memberSubtaskCounts[assigneeIndex]++;
         }
 
-        // Calculate a reasonable deadline (3-7 days from now based on complexity)
+        // Calculate SEQUENTIAL deadlines: 1-2 days depending on task complexity
+        // Estimate complexity based on description length and position in sequence
+        const descriptionLength = subtask.description?.length || 0;
+        const isComplexTask = descriptionLength > 150 || subtask.title.toLowerCase().includes('research') || 
+                             subtask.title.toLowerCase().includes('design') || subtask.title.toLowerCase().includes('implement');
+        
         const deadlineDate = new Date();
-        deadlineDate.setDate(deadlineDate.getDate() + Math.floor(Math.random() * 5) + 3); // 3-7 days
+        const baseDays = 1; // Start 1 day from now for the first subtask
+        const daysForThisTask = isComplexTask ? 2 : 1; // 2 days for complex tasks, 1 day for simple tasks
+        const totalDaysFromNow = baseDays + (i * daysForThisTask);
+        deadlineDate.setDate(deadlineDate.getDate() + totalDaysFromNow);
 
         const { data: createdSubtask, error: subtaskError } = await supabase
           .from('subtasks')

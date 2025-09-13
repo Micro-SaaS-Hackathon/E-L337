@@ -26,110 +26,7 @@ interface AITechStackChatProps {
   initialStack?: Partial<TechStack>;
 }
 
-const TECH_STACK_OPTIONS = {
-  frontend: {
-    framework: {
-      react: "React",
-      nextjs: "Next.js",
-      vue: "Vue.js",
-      angular: "Angular",
-      svelte: "Svelte",
-      gatsby: "Gatsby",
-    },
-    styling: {
-      tailwind: "Tailwind CSS",
-      shadcn: "shadcn/ui",
-      mui: "Material-UI",
-      "styled-components": "Styled Components",
-      sass: "Sass/SCSS",
-      chakra: "Chakra UI",
-      emotion: "Emotion",
-    },
-  },
-  backend: {
-    language: {
-      typescript: "TypeScript/Node.js",
-      python: "Python",
-      java: "Java",
-      go: "Go",
-      rust: "Rust",
-      csharp: "C#/.NET",
-    },
-    framework: {
-      express: "Express.js",
-      fastify: "Fastify",
-      nestjs: "NestJS",
-      koa: "Koa.js",
-      hapi: "Hapi.js",
-      django: "Django",
-      fastapi: "FastAPI",
-      flask: "Flask",
-      tornado: "Tornado",
-      pyramid: "Pyramid",
-      spring: "Spring Boot",
-      quarkus: "Quarkus",
-      micronaut: "Micronaut",
-      aspnet: "ASP.NET Core",
-      gin: "Gin",
-      echo: "Echo",
-      fiber: "Fiber",
-      actix: "Actix Web",
-      warp: "Warp",
-      rocket: "Rocket",
-    },
-    database: {
-      postgresql: "PostgreSQL",
-      mongodb: "MongoDB",
-      mysql: "MySQL",
-      redis: "Redis",
-      supabase: "Supabase",
-      firebase: "Firebase Firestore",
-      dynamodb: "DynamoDB",
-    },
-  },
-  cloud: {
-    provider: {
-      vercel: "Vercel",
-      netlify: "Netlify",
-      aws: "Amazon Web Services",
-      gcp: "Google Cloud Platform",
-      azure: "Microsoft Azure",
-      railway: "Railway",
-      render: "Render",
-    },
-    hosting: {
-      static: "Static Hosting",
-      serverless: "Serverless Functions",
-      containers: "Container Hosting",
-      vps: "VPS/Dedicated",
-    },
-  },
-  optional: {
-    payment: {
-      stripe: "Stripe",
-      paypal: "PayPal",
-      square: "Square",
-      razorpay: "Razorpay",
-    },
-    messageQueue: {
-      "redis-queue": "Redis Queue",
-      rabbitmq: "RabbitMQ",
-      "aws-sqs": "AWS SQS",
-      kafka: "Apache Kafka",
-    },
-    analytics: {
-      "google-analytics": "Google Analytics",
-      mixpanel: "Mixpanel",
-      amplitude: "Amplitude",
-    },
-    testing: {
-      jest: "Jest",
-      cypress: "Cypress",
-      playwright: "Playwright",
-      vitest: "Vitest",
-    },
-  },
-};
+
 
 export default function AITechStackChat({
   onStackChange,
@@ -283,42 +180,8 @@ export default function AITechStackChat({
     field: string,
     value: string
   ) => {
-    const v = (value || "").toLowerCase().replace(/[^a-z0-9.+#]/g, "");
-    const mapByPath: any = {
-      "frontend.framework": TECH_STACK_OPTIONS.frontend.framework,
-      "frontend.styling": TECH_STACK_OPTIONS.frontend.styling,
-      "backend.language": TECH_STACK_OPTIONS.backend.language,
-      "backend.framework": TECH_STACK_OPTIONS.backend.framework,
-      "backend.database": TECH_STACK_OPTIONS.backend.database,
-      "cloud.provider": TECH_STACK_OPTIONS.cloud.provider,
-      // optional subkeys
-      "optional.payment": TECH_STACK_OPTIONS.optional.payment,
-      "optional.messageQueue": TECH_STACK_OPTIONS.optional.messageQueue,
-      "optional.analytics": TECH_STACK_OPTIONS.optional.analytics,
-      "optional.testing": TECH_STACK_OPTIONS.optional.testing,
-    };
-
-    const key = `${category}.${field}`;
-    const dict = mapByPath[key];
-    if (!dict) return value;
-
-    // Try match by key or display name, case-insensitive
-    for (const k of Object.keys(dict)) {
-      const cmpKey = k.toLowerCase();
-      const cmpName = String((dict as any)[k])
-        .toLowerCase()
-        .replace(/[^a-z0-9.+#]/g, "");
-      if (v === cmpKey || v === cmpName) return k;
-    }
-    // Fuzzy contains
-    for (const k of Object.keys(dict)) {
-      const cmpKey = k.toLowerCase();
-      const cmpName = String((dict as any)[k])
-        .toLowerCase()
-        .replace(/[^a-z0-9.+#]/g, "");
-      if (cmpName.includes(v) || v.includes(cmpKey)) return k;
-    }
-    return value; // fall back
+    // Simply return the value as-is, allowing any tech stack
+    return value;
   };
 
   const clearChat = () => {
@@ -467,19 +330,21 @@ export default function AITechStackChat({
     category: string;
     field: string;
     value: string;
+    name?: string;
   }) => {
     const cat = normalizeCategory(s.category);
     const fld = normalizeField(s.field);
-    const val = canonicalizeValue(cat, fld, s.value);
+    // Use the AI-provided name if available, otherwise use the value
+    const displayValue = s.name || s.value;
     setCurrentStack((prev) => {
       const next: any = { ...prev };
       if (!next[cat]) next[cat] = {};
       if (cat === "frontend" && fld === "styling") {
         const arr = Array.isArray(next[cat][fld]) ? next[cat][fld] : [];
-        if (!arr.includes(val)) next[cat][fld] = [...arr, val];
+        if (!arr.includes(displayValue)) next[cat][fld] = [...arr, displayValue];
         else next[cat][fld] = arr;
       } else {
-        next[cat][fld] = val;
+        next[cat][fld] = displayValue;
       }
       return next;
     });
@@ -489,7 +354,7 @@ export default function AITechStackChat({
   const handleAcceptSuggestion = (
     messageIndex: number,
     suggestionIndex: number,
-    s: { category: string; field: string; value: string }
+    s: { category: string; field: string; value: string; name?: string }
   ) => {
     acceptSuggestion(s);
     setMessages(prev => prev.map((m,i) => {
@@ -513,11 +378,7 @@ export default function AITechStackChat({
 
     // Frontend
     if (currentStack.frontend?.framework) {
-      const name =
-        TECH_STACK_OPTIONS.frontend.framework[
-          currentStack.frontend
-            .framework as keyof typeof TECH_STACK_OPTIONS.frontend.framework
-        ];
+      const name = currentStack.frontend.framework;
       // Vibrant color mapping for frameworks
       const frameworkColors: Record<string, string> = {
         react: "bg-[#61dafb] text-[#20232a] border-[#61dafb]",
@@ -527,7 +388,7 @@ export default function AITechStackChat({
         svelte: "bg-[#ff3e00] text-white border-[#ff3e00]",
         gatsby: "bg-[#663399] text-white border-[#663399]",
       };
-      const fw = currentStack.frontend.framework;
+      const fw = currentStack.frontend.framework.toLowerCase();
       const colorClass =
         frameworkColors[fw] ||
         "bg-primary/80 text-primary-foreground border-primary";
@@ -565,19 +426,16 @@ export default function AITechStackChat({
         emotion: "bg-[#ff4785] text-white border-[#ff4785]",
       };
       currentStack.frontend.styling.forEach((style) => {
-        const name =
-          TECH_STACK_OPTIONS.frontend.styling[
-            style as keyof typeof TECH_STACK_OPTIONS.frontend.styling
-          ];
+        const name = style;
         const colorClass =
-          stylingColors[style] ||
+          stylingColors[style.toLowerCase()] ||
           "bg-primary/80 text-primary-foreground border-primary";
         stackItems.push(
           <span
             key={`frontend-styling-${style}`}
             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold border shadow text-[10px] ${colorClass} transition-all hover:scale-[1.04] hover:shadow-md hover:border-primary/60 cursor-pointer group`}
           >
-            {name || style}
+            {name}
             <button
               onClick={() => removeStackItem("frontend", "styling", style)}
               className="ml-0.5 px-1 py-0 rounded bg-transparent text-xs text-muted-foreground hover:text-destructive border-none outline-none"
@@ -594,11 +452,7 @@ export default function AITechStackChat({
 
     // Backend Language
     if (currentStack.backend?.language) {
-      const name =
-        TECH_STACK_OPTIONS.backend.language[
-          currentStack.backend
-            .language as keyof typeof TECH_STACK_OPTIONS.backend.language
-        ];
+      const name = currentStack.backend.language;
       stackItems.push(
         <span
           key="backend-language"
@@ -620,11 +474,7 @@ export default function AITechStackChat({
 
     // Backend Framework
     if (currentStack.backend?.framework) {
-      const name =
-        TECH_STACK_OPTIONS.backend.framework[
-          currentStack.backend
-            .framework as keyof typeof TECH_STACK_OPTIONS.backend.framework
-        ];
+      const name = currentStack.backend.framework;
       stackItems.push(
         <span
           key="backend-framework"
@@ -646,11 +496,7 @@ export default function AITechStackChat({
 
     // Backend Database
     if (currentStack.backend?.database) {
-      const name =
-        TECH_STACK_OPTIONS.backend.database[
-          currentStack.backend
-            .database as keyof typeof TECH_STACK_OPTIONS.backend.database
-        ];
+      const name = currentStack.backend.database;
       stackItems.push(
         <span
           key="backend-database"
@@ -672,11 +518,7 @@ export default function AITechStackChat({
 
     // Cloud Provider
     if (currentStack.cloud?.provider) {
-      const name =
-        TECH_STACK_OPTIONS.cloud.provider[
-          currentStack.cloud
-            .provider as keyof typeof TECH_STACK_OPTIONS.cloud.provider
-        ];
+      const name = currentStack.cloud.provider;
       stackItems.push(
         <span
           key="cloud-provider"
