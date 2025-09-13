@@ -24,18 +24,30 @@ interface Task {
   title: string;
   description?: string;
   status: "todo" | "in-progress" | "completed";
-  assigned_to?: string;
+  deadline?: string;
+  created_at: string;
+  position: number;
+}
+
+interface Subtask {
+  id: string;
+  title: string;
+  description?: string;
+  status: "todo" | "in-progress" | "completed";
+  deadline?: string;
+  task_id: string;
   assigned_user?: {
     id: string;
     email: string;
     raw_user_meta_data?: {
       full_name?: string;
-      field?: string;
     };
   };
-  deadline?: string;
-  created_at: string;
-  position: number;
+  tasks?: {
+    id: string;
+    title: string;
+    team_id: string;
+  };
 }
 
 interface TeamMember {
@@ -67,8 +79,10 @@ export default function TeamPage({ team, onBack }: TeamPageProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showMemberInput, setShowMemberInput] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [isLoadingTasks, setIsLoadingTasks] = useState(true);
+  const [isLoadingSubtasks, setIsLoadingSubtasks] = useState(true);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   const [generationStatus, setGenerationStatus] = useState("");
   const [generatingTasks, setGeneratingTasks] = useState<Task[]>([]);
@@ -77,7 +91,6 @@ export default function TeamPage({ team, onBack }: TeamPageProps) {
     total: 0,
   });
   const [showSkeletonCard, setShowSkeletonCard] = useState(false);
-  const [isAllocating, setIsAllocating] = useState(false);
   const [hasProcessedGoal, setHasProcessedGoal] = useState(false);
 
   const { user } = useAuth();
@@ -87,6 +100,7 @@ export default function TeamPage({ team, onBack }: TeamPageProps) {
 
   useEffect(() => {
     loadTasks();
+    loadSubtasks();
     loadMembers();
     checkForProcessedGoals();
   }, []);
@@ -131,6 +145,28 @@ export default function TeamPage({ team, onBack }: TeamPageProps) {
       console.error("Error loading tasks:", error);
     } finally {
       setIsLoadingTasks(false);
+    }
+  };
+
+  const loadSubtasks = async () => {
+    try {
+      const session = await supabase.auth.getSession();
+      if (!session.data.session) return;
+
+      const response = await fetch(`/api/team-subtasks?team_id=${team.id}`, {
+        headers: {
+          Authorization: `Bearer ${session.data.session.access_token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSubtasks(data.subtasks || []);
+      }
+    } catch (error) {
+      console.error("Error loading subtasks:", error);
+    } finally {
+      setIsLoadingSubtasks(false);
     }
   };
 
@@ -249,6 +285,7 @@ export default function TeamPage({ team, onBack }: TeamPageProps) {
                 setShowSkeletonCard(false);
                 // Tasks have been created, reload them
                 await loadTasks();
+                await loadSubtasks();
                 setHasProcessedGoal(true);
                 setShowMemberInput(true);
                 setGoalInput("");
@@ -305,39 +342,6 @@ export default function TeamPage({ team, onBack }: TeamPageProps) {
     await loadMembers();
   };
 
-  const handleAllocateTasks = async () => {
-    if (isAllocating) return;
-
-    setIsAllocating(true);
-    try {
-      const session = await supabase.auth.getSession();
-      if (!session.data.session) return;
-
-      const response = await fetch("/api/allocate-tasks", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.data.session.access_token}`,
-        },
-        body: JSON.stringify({
-          team_id: team.id,
-        }),
-      });
-
-      if (response.ok) {
-        // Reload tasks to show the assignments
-        await loadTasks();
-      } else {
-        const errorData = await response.json();
-        console.error("Allocation error:", errorData.error);
-      }
-    } catch (error) {
-      console.error("Error allocating tasks:", error);
-    } finally {
-      setIsAllocating(false);
-    }
-  };
-
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     try {
       const session = await supabase.auth.getSession();
@@ -375,6 +379,42 @@ export default function TeamPage({ team, onBack }: TeamPageProps) {
     await handleTaskUpdate(taskId, { status: newStatus });
   };
 
+  const handleGenerateSubtasks = async (task: Task) => {
+    try {
+      const session = await supabase.auth.getSession();
+      if (!session.data.session) return;
+
+      // Generate subtasks with auto-assignment
+      const generateResponse = await fetch("/api/generate-subtasks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.data.session.access_token}`,
+        },
+        body: JSON.stringify({
+          task_id: task.id,
+          team_id: team.id,
+        }),
+      });
+
+      if (!generateResponse.ok) {
+        const errorData = await generateResponse.json();
+        console.error("Generation error:", errorData.error);
+        return;
+      }
+
+      const result = await generateResponse.json();
+      console.log("Generated and assigned subtasks:", result.message);
+
+      // Reload tasks to show any updates
+      await loadTasks();
+      await loadSubtasks();
+      
+    } catch (error) {
+      console.error("Error generating and allocating subtasks:", error);
+    }
+  };
+
   const adjustTextareaHeight = () => {
     const textarea = textareaRef.current;
     if (textarea) {
@@ -384,7 +424,6 @@ export default function TeamPage({ team, onBack }: TeamPageProps) {
   };
 
   const canAddMembers = team.role === "owner" || team.role === "admin";
-  const unassignedTasksCount = tasks.filter((task) => !task.assigned_to).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -521,25 +560,7 @@ export default function TeamPage({ team, onBack }: TeamPageProps) {
                   </h2>
                 </div>
 
-                {unassignedTasksCount > 0 && members.length > 0 && (
-                  <Button
-                    onClick={handleAllocateTasks}
-                    disabled={isAllocating}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                  >
-                    {isAllocating ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Allocating...
-                      </>
-                    ) : (
-                      <>
-                        <Calendar className="h-4 w-4" />
-                        Allocate Tasks ({unassignedTasksCount})
-                      </>
-                    )}
-                  </Button>
-                )}
+
               </div>
 
               <p className="text-muted-foreground mb-4">
@@ -552,7 +573,7 @@ export default function TeamPage({ team, onBack }: TeamPageProps) {
 
         {/* Kanban Board */}
         <div className="mb-8 w-full">
-          {isLoadingTasks ? (
+          {isLoadingTasks || isLoadingSubtasks ? (
             <div className="bg-card rounded-lg shadow-sm border border-muted p-8">
               <div className="animate-pulse flex gap-6">
                 {[1, 2, 3].map((i) => (
@@ -575,13 +596,14 @@ export default function TeamPage({ team, onBack }: TeamPageProps) {
               generatingTasks={generatingTasks}
               showSkeletonCard={showSkeletonCard}
               teamId={team.id}
+              onGenerateSubtasks={handleGenerateSubtasks}
             />
           )}
         </div>
 
         {/* Calendar */}
         <div className="mb-8">
-          <TeamCalendar tasks={tasks} />
+          <TeamCalendar tasks={tasks} subtasks={subtasks} />
         </div>
 
         {/* Team Members */}

@@ -114,32 +114,9 @@ export async function GET(request: NextRequest) {
       throw tasksError;
     }
 
-    // Get user information for assigned tasks
-    const { data: users, error: usersError } = await supabase.auth.admin.listUsers();
-    
-    if (usersError) {
-      console.error('Error fetching users:', usersError);
-      // Continue without user info rather than failing completely
-    }
-
-    // Add user information to tasks
-    const tasksWithUsers = tasks.map(task => {
-      if (!task.assigned_to || !users) {
-        return task;
-      }
-      
-      const assignedUser = users.users.find(u => u.id === task.assigned_to);
-      return {
-        ...task,
-        assigned_user: assignedUser ? {
-          id: assignedUser.id,
-          email: assignedUser.email,
-          raw_user_meta_data: assignedUser.user_metadata
-        } : null
-      };
-    });
-
-    return NextResponse.json({ tasks: tasksWithUsers });
+    // Tasks are no longer assigned to individuals, they're assigned to teams
+    // So we don't need to fetch user information for task assignments
+    return NextResponse.json({ tasks });
   } catch (error: any) {
     console.error('Error fetching tasks:', error);
     return NextResponse.json(
@@ -165,7 +142,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { team_id, title, description, status = 'todo', assigned_to, deadline } = body;
+    const { team_id, title, description, status = 'todo', deadline } = body;
 
     if (!team_id || !title) {
       return NextResponse.json(
@@ -194,7 +171,6 @@ export async function POST(request: NextRequest) {
         title,
         description,
         status,
-        assigned_to,
         deadline: deadline ? new Date(deadline).toISOString() : null
       })
       .select()
@@ -230,7 +206,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, title, description, status, assigned_to, deadline } = body;
+    const { id, title, description, status, deadline } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Task ID is required' }, { status: 400 });
@@ -264,7 +240,6 @@ export async function PUT(request: NextRequest) {
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
     if (status !== undefined) updateData.status = status;
-    if (assigned_to !== undefined) updateData.assigned_to = assigned_to;
     if (deadline !== undefined) updateData.deadline = deadline ? new Date(deadline).toISOString() : null;
 
     const { data: updatedTask, error: updateError } = await supabase

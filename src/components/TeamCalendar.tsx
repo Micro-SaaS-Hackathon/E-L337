@@ -25,16 +25,45 @@ interface Task {
   };
 }
 
-interface TeamCalendarProps {
-  tasks: Task[];
+interface Subtask {
+  id: string;
+  title: string;
+  deadline?: string;
+  status: "todo" | "in-progress" | "completed";
+  task_id: string;
+  assigned_user?: {
+    id: string;
+    email: string;
+    raw_user_meta_data?: {
+      full_name?: string;
+    };
+  };
+  tasks?: {
+    id: string;
+    title: string;
+    team_id: string;
+  };
 }
 
-export default function TeamCalendar({ tasks }: TeamCalendarProps) {
+type CalendarItem = Task | (Subtask & { type: 'subtask' });
+
+interface TeamCalendarProps {
+  tasks: Task[];
+  subtasks?: Subtask[];
+}
+
+export default function TeamCalendar({ tasks, subtasks = [] }: TeamCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const today = new Date();
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
+
+  // Combine tasks and subtasks for calendar display
+  const allItems: CalendarItem[] = [
+    ...tasks,
+    ...subtasks.map(subtask => ({ ...subtask, type: 'subtask' as const }))
+  ];
 
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
   const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
@@ -71,13 +100,13 @@ export default function TeamCalendar({ tasks }: TeamCalendarProps) {
   };
 
   const getTasksForDate = (date: Date) => {
-    return tasks.filter((task) => {
-      if (!task.deadline) return false;
-      const taskDate = new Date(task.deadline);
+    return allItems.filter((item) => {
+      if (!item.deadline) return false;
+      const itemDate = new Date(item.deadline);
       return (
-        taskDate.getDate() === date.getDate() &&
-        taskDate.getMonth() === date.getMonth() &&
-        taskDate.getFullYear() === date.getFullYear()
+        itemDate.getDate() === date.getDate() &&
+        itemDate.getMonth() === date.getMonth() &&
+        itemDate.getFullYear() === date.getFullYear()
       );
     });
   };
@@ -91,10 +120,10 @@ export default function TeamCalendar({ tasks }: TeamCalendarProps) {
     const isCurrentMonth = date.getMonth() === currentMonth;
     const tasksForDate = getTasksForDate(date);
     const hasOverdueTasks = tasksForDate.some(
-      (task) =>
-        task.deadline &&
-        new Date(task.deadline) < today &&
-        task.status !== "completed"
+      (item) =>
+        item.deadline &&
+        new Date(item.deadline) < today &&
+        item.status !== "completed"
     );
 
     let baseClasses =
@@ -132,30 +161,40 @@ export default function TeamCalendar({ tasks }: TeamCalendarProps) {
           <div className="mt-1 space-y-1">
             {getTasksForDate(date)
               .slice(0, 2)
-              .map((task) => (
-                <Badge
-                  key={task.id}
-                  className={`w-full text-xs px-2 py-1 rounded-full truncate  ${
-                    task.status === "completed"
-                      ? "bg-success/10 text-success"
-                      : task.deadline && new Date(task.deadline) < today
-                      ? "bg-destructive/10 text-destructive"
-                      : "bg-primary/10 text-primary"
-                  }`}
-                  title={task.title}
-                >
-                  {task.title}
-                  {task.deadline && (
-                    <span className="ml-1 text-muted-foreground">
-                      {" "}
-                      {new Date(task.deadline).toLocaleTimeString("en-US", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  )}
-                </Badge>
-              ))}
+              .map((item) => {
+                const isSubtask = 'type' in item && item.type === 'subtask';
+                const subtaskItem = isSubtask ? item as (Subtask & { type: 'subtask' }) : null;
+                
+                return (
+                  <Badge
+                    key={item.id}
+                    className={`w-full text-xs px-2 py-1 rounded-full truncate  ${
+                      item.status === "completed"
+                        ? "bg-success/10 text-success"
+                        : item.deadline && new Date(item.deadline) < today
+                        ? "bg-destructive/10 text-destructive"
+                        : isSubtask
+                        ? "bg-blue-100 text-blue-800 border border-blue-200"
+                        : "bg-primary/10 text-primary"
+                    }`}
+                    title={`${isSubtask ? `[Subtask] ${item.title}` : item.title}${subtaskItem?.tasks ? ` (${subtaskItem.tasks.title})` : ''}`}
+                  >
+                    {isSubtask && (
+                      <span className="mr-1 text-xs opacity-75">S</span>
+                    )}
+                    {item.title}
+                    {item.deadline && (
+                      <span className="ml-1 text-muted-foreground">
+                        {" "}
+                        {new Date(item.deadline).toLocaleTimeString("en-US", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    )}
+                  </Badge>
+                );
+              })}
             {getTasksForDate(date).length > 2 && (
               <div className="text-xs text-gray-500">
                 +{getTasksForDate(date).length - 2} more
@@ -175,25 +214,35 @@ export default function TeamCalendar({ tasks }: TeamCalendarProps) {
           <div className="mt-1 space-y-1">
             {getTasksForDate(date)
               .slice(0, 2)
-              .map((task) => (
-                <div
-                  key={task.id}
-                  className={`text-xs p-1 rounded truncate ${
-                    task.status === "completed"
-                      ? "bg-green-200 text-green-800"
-                      : task.deadline && new Date(task.deadline) < today
-                      ? "bg-destructive text-destructive-foreground"
-                      : "bg-primary/10 text-primary"
-                  }`}
-                  title={`${task.title} - ${
-                    task.assigned_user?.raw_user_meta_data?.full_name ||
-                    task.assigned_user?.email ||
-                    "Unassigned"
-                  }`}
-                >
-                  {task.title}
-                </div>
-              ))}
+              .map((item) => {
+                const isSubtask = 'type' in item && item.type === 'subtask';
+                const subtaskItem = isSubtask ? item as (Subtask & { type: 'subtask' }) : null;
+                
+                return (
+                  <div
+                    key={item.id}
+                    className={`text-xs p-1 rounded truncate ${
+                      item.status === "completed"
+                        ? "bg-green-200 text-green-800"
+                        : item.deadline && new Date(item.deadline) < today
+                        ? "bg-destructive text-destructive-foreground"
+                        : isSubtask
+                        ? "bg-blue-100 text-blue-800 border border-blue-200"
+                        : "bg-primary/10 text-primary"
+                    }`}
+                    title={`${isSubtask ? `[Subtask] ${item.title}` : item.title}${subtaskItem?.tasks ? ` (${subtaskItem.tasks.title})` : ''} - ${
+                      item.assigned_user?.raw_user_meta_data?.full_name ||
+                      item.assigned_user?.email ||
+                      "Unassigned"
+                    }`}
+                  >
+                    {isSubtask && (
+                      <span className="mr-1 text-xs opacity-75 font-bold">S</span>
+                    )}
+                    {item.title}
+                  </div>
+                );
+              })}
             {getTasksForDate(date).length > 2 && (
               <div className="text-xs text-gray-500">
                 +{getTasksForDate(date).length - 2} more
@@ -214,21 +263,30 @@ export default function TeamCalendar({ tasks }: TeamCalendarProps) {
           <div className="mt-1 space-y-1">
             {getTasksForDate(date)
               .slice(0, 2)
-              .map((task) => (
-                <div
-                  key={task.id}
-                  className={`text-xs p-1 rounded truncate ${
-                    task.status === "completed"
-                      ? "bg-green-100 text-green-800"
-                      : task.deadline && new Date(task.deadline) < today
-                      ? "bg-red-100 text-red-800"
-                      : "bg-blue-100 text-blue-800"
-                  }`}
-                  title={task.title}
-                >
-                  {task.title}
-                </div>
-              ))}
+              .map((item) => {
+                const isSubtask = 'type' in item && item.type === 'subtask';
+                
+                return (
+                  <div
+                    key={item.id}
+                    className={`text-xs p-1 rounded truncate ${
+                      item.status === "completed"
+                        ? "bg-green-100 text-green-800"
+                        : item.deadline && new Date(item.deadline) < today
+                        ? "bg-red-100 text-red-800"
+                        : isSubtask
+                        ? "bg-blue-50 text-blue-700 border border-blue-100"
+                        : "bg-blue-100 text-blue-800"
+                    }`}
+                    title={`${isSubtask ? `[Subtask] ${item.title}` : item.title}`}
+                  >
+                    {isSubtask && (
+                      <span className="mr-1 text-xs opacity-75 font-bold">S</span>
+                    )}
+                    {item.title}
+                  </div>
+                );
+              })}
             {getTasksForDate(date).length > 2 && (
               <div className="text-xs text-gray-500">
                 +{getTasksForDate(date).length - 2} more
@@ -242,8 +300,8 @@ export default function TeamCalendar({ tasks }: TeamCalendarProps) {
     return days;
   };
 
-  const upcomingTasks = tasks
-    .filter((task) => task.deadline && new Date(task.deadline) >= today)
+  const upcomingTasks = allItems
+    .filter((item) => item.deadline && new Date(item.deadline) >= today)
     .sort(
       (a, b) =>
         new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime()
@@ -296,53 +354,66 @@ export default function TeamCalendar({ tasks }: TeamCalendarProps) {
             Upcoming Deadlines
           </h3>
           <div className="space-y-2">
-            {upcomingTasks.map((task) => (
-              <div
-                key={task.id}
-                className="flex items-center justify-between text-sm bg-background rounded-lg px-3 py-2 shadow-sm border border-muted"
-              >
-                <div className="flex-1 truncate flex items-center gap-2">
-                  <Badge
-                    className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      task.status === "completed"
-                        ? "bg-primary/10 text-primary"
-                        : task.deadline && new Date(task.deadline) < today
-                        ? "bg-destructive/10 text-destructive"
-                        : "bg-primary/10 text-primary"
-                    }`}
-                  >
-                    {task.status}
-                  </Badge>
-                  <span className="font-medium text-foreground">
-                    {task.title}
-                  </span>
-                  {task.assigned_user && (
-                    <span className="text-muted-foreground ml-2">
-                      -{" "}
-                      {task.assigned_user.raw_user_meta_data?.full_name ||
-                        task.assigned_user.email}
+            {upcomingTasks.map((item) => {
+              const isSubtask = 'type' in item && item.type === 'subtask';
+              const subtaskItem = isSubtask ? item as (Subtask & { type: 'subtask' }) : null;
+              
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between text-sm bg-background rounded-lg px-3 py-2 shadow-sm border border-muted"
+                >
+                  <div className="flex-1 truncate flex items-center gap-2">
+                    <Badge
+                      className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        item.status === "completed"
+                          ? "bg-primary/10 text-primary"
+                          : item.deadline && new Date(item.deadline) < today
+                          ? "bg-destructive/10 text-destructive"
+                          : "bg-primary/10 text-primary"
+                      }`}
+                    >
+                      {item.status}
+                    </Badge>
+                    <span className="font-medium text-foreground">
+                      {isSubtask && (
+                        <span className="mr-1 text-xs opacity-75 bg-blue-100 text-blue-700 px-1 rounded">S</span>
+                      )}
+                      {item.title}
+                      {subtaskItem?.tasks && (
+                        <span className="text-xs text-muted-foreground ml-1">
+                          ({subtaskItem.tasks.title})
+                        </span>
+                      )}
                     </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground ml-2">
-                  <Clock className="h-4 w-4" />
-                  <span>
-                    {new Date(task.deadline!).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                    {task.deadline && (
-                      <span className="ml-1">
-                        {new Date(task.deadline!).toLocaleTimeString("en-US", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                    {item.assigned_user && (
+                      <span className="text-muted-foreground ml-2">
+                        -{" "}
+                        {item.assigned_user.raw_user_meta_data?.full_name ||
+                          item.assigned_user.email}
                       </span>
                     )}
-                  </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground ml-2">
+                    <Clock className="h-4 w-4" />
+                    <span>
+                      {new Date(item.deadline!).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                      {item.deadline && (
+                        <span className="ml-1">
+                          {new Date(item.deadline!).toLocaleTimeString("en-US", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      )}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

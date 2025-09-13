@@ -27,6 +27,7 @@ import {
   X,
   Loader2,
   Plus,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
@@ -46,15 +47,6 @@ interface Task {
   title: string;
   description?: string;
   status: "todo" | "in-progress" | "completed";
-  assigned_to?: string;
-  assigned_user?: {
-    id: string;
-    email: string;
-    raw_user_meta_data?: {
-      full_name?: string;
-      field?: string;
-    };
-  };
   deadline?: string;
   created_at: string;
   position: number;
@@ -69,6 +61,20 @@ interface Subtask {
   is_completed: boolean;
   position: number;
   created_at: string;
+  assigned_to?: string;
+  assigned_user?: {
+    id: string;
+    email: string;
+    raw_user_meta_data?: {
+      full_name?: string;
+      field?: string;
+    };
+  };
+  deadline?: string;
+  status?: "todo" | "in-progress" | "completed";
+  priority?: "low" | "medium" | "high" | "urgent";
+  estimated_hours?: number;
+  actual_hours?: number;
 }
 
 interface KanbanBoardProps {
@@ -78,6 +84,7 @@ interface KanbanBoardProps {
   generatingTasks?: Task[]; // Add this for skeleton tasks
   showSkeletonCard?: boolean; // Add this to control skeleton visibility
   teamId?: string; // Needed for creating tasks
+  onGenerateSubtasks?: (task: Task) => void;
 }
 
 interface TaskCardProps {
@@ -85,6 +92,8 @@ interface TaskCardProps {
   isDragging?: boolean;
   onTaskClick: (task: Task) => void;
   onEditClick?: (task: Task) => void;
+  onGenerateSubtasks?: (task: Task) => void;
+  isGeneratingSubtasks?: boolean;
 }
 
 const SkeletonTaskCard: React.FC = () => {
@@ -121,6 +130,8 @@ const TaskCard: React.FC<TaskCardProps> = ({
   isDragging,
   onTaskClick,
   onEditClick,
+  onGenerateSubtasks,
+  isGeneratingSubtasks,
 }) => {
   const {
     attributes,
@@ -181,6 +192,34 @@ const TaskCard: React.FC<TaskCardProps> = ({
         </p>
       )}
 
+      {/* AI Generate Subtasks Button */}
+      {!task.isGenerating && (
+        <div className="mb-3">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              onGenerateSubtasks?.(task);
+            }}
+            disabled={isGeneratingSubtasks}
+            className="w-full text-xs"
+          >
+            {isGeneratingSubtasks ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                Adding & Allocating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3 w-3 mr-1" />
+                AI Generate
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
       {/* Task Tags */}
       {task.tags && task.tags.length > 0 && (
         <div className="mb-3">
@@ -189,22 +228,6 @@ const TaskCard: React.FC<TaskCardProps> = ({
       )}
 
       <div className="space-y-2">
-        {task.assigned_user && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <User size={12} />
-            <span>
-              {task.assigned_user.raw_user_meta_data?.full_name ||
-                task.assigned_user.email?.split("@")[0] ||
-                "Unknown"}
-            </span>
-            {task.assigned_user.raw_user_meta_data?.field && (
-              <span className="text-muted-foreground">
-                • {task.assigned_user.raw_user_meta_data.field}
-              </span>
-            )}
-          </div>
-        )}
-
         {task.deadline && (
           <div
             className={`flex items-center gap-2 text-xs ${
@@ -242,6 +265,8 @@ const Column: React.FC<{
   showSkeletonCard?: boolean;
   headerActions?: React.ReactNode;
   onEditClick?: (task: Task) => void;
+  onGenerateSubtasks?: (task: Task) => void;
+  generatingSubtasksTaskId?: string | null;
 }> = ({
   title,
   status,
@@ -253,6 +278,8 @@ const Column: React.FC<{
   showSkeletonCard,
   headerActions,
   onEditClick,
+  onGenerateSubtasks,
+  generatingSubtasksTaskId,
 }) => {
   const { setNodeRef } = useDroppable({
     id: `column-${status}`,
@@ -321,6 +348,8 @@ const Column: React.FC<{
                   task={task}
                   onTaskClick={onTaskClick}
                   onEditClick={onEditClick}
+                  onGenerateSubtasks={onGenerateSubtasks}
+                  isGeneratingSubtasks={generatingSubtasksTaskId === task.id}
                 />
                 {subtasks.length > 0 && (
                   <div className="absolute -bottom-1 -right-1 bg-blue-100 text-blue-800 text-xs px-1.5 py-0.5 rounded-full border border-blue-200">
@@ -348,6 +377,7 @@ export default function KanbanBoard({
   generatingTasks = [],
   showSkeletonCard = false,
   teamId,
+  onGenerateSubtasks,
 }: KanbanBoardProps) {
   // Track which column is being hovered during drag
   const [hoveredColumn, setHoveredColumn] = useState<string | null>(null);
@@ -355,6 +385,7 @@ export default function KanbanBoard({
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [subtasksMap, setSubtasksMap] = useState<Record<string, Subtask[]>>({});
+  const [generatingSubtasksTaskId, setGeneratingSubtasksTaskId] = useState<string | null>(null);
   // Local created tasks (so UI updates without parent refetch)
   const [createdTasks, setCreatedTasks] = useState<Task[]>([]);
   // Add Task modal for To Do
@@ -364,10 +395,9 @@ export default function KanbanBoard({
   const [newDeadline, setNewDeadline] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string>("");
-  // New fields for role & assignee
+  // New fields for role
   const roleOptions = ["frontend", "backend", "fullstack", "devops", "design", "qa", "product"];
   const [newRole, setNewRole] = useState<string>("");
-  const [assigneeId, setAssigneeId] = useState<string>("");
   const [teamMembers, setTeamMembers] = useState<Array<{ id: string; name: string; email: string; role: string; field: string }>>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   // Edit state for In Progress tasks
@@ -622,7 +652,6 @@ export default function KanbanBoard({
           description: finalDescription || null,
           status: "todo",
           deadline: newDeadline || null,
-          assigned_to: assigneeId || null,
         }),
       });
       if (!res.ok) throw new Error("Create failed");
@@ -632,12 +661,6 @@ export default function KanbanBoard({
         title: data.task.title,
         description: data.task.description || undefined,
         status: data.task.status,
-        assigned_to: data.task.assigned_to || undefined,
-        assigned_user: teamMembers.find(m => m.id === data.task.assigned_to) ? {
-          id: data.task.assigned_to,
-          email: teamMembers.find(m => m.id === data.task.assigned_to)!.email,
-          raw_user_meta_data: { full_name: teamMembers.find(m => m.id === data.task.assigned_to)!.name, field: teamMembers.find(m => m.id === data.task.assigned_to)!.field }
-        } : undefined,
         deadline: data.task.deadline || undefined,
         created_at: data.task.created_at,
         position: getTasksByStatus("todo").length,
@@ -648,7 +671,6 @@ export default function KanbanBoard({
       setNewTitle("");
       setNewDescription("");
       setNewDeadline("");
-      setAssigneeId("");
       setNewRole("");
     } catch (e: any) {
       setCreateError(e?.message || "Failed to create");
@@ -743,6 +765,8 @@ export default function KanbanBoard({
                   subtasksMap={subtasksMap}
                   isGenerating={isGenerating}
                   showSkeletonCard={showSkeletonCard}
+                  onGenerateSubtasks={onGenerateSubtasks}
+                  generatingSubtasksTaskId={generatingSubtasksTaskId}
                   headerActions={
                     column.status === "todo" ? (
                       <Dialog
@@ -787,7 +811,7 @@ export default function KanbanBoard({
                                 }
                               />
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 gap-3">
                               <div>
                                 <label className="text-sm text-muted-foreground">Role / Category</label>
                                 <select
@@ -799,27 +823,6 @@ export default function KanbanBoard({
                                   {roleOptions.map((r) => (
                                     <option key={r} value={r}>
                                       {r}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label className="text-sm text-muted-foreground flex items-center justify-between">
-                                  Assignee
-                                  {loadingMembers && (
-                                    <span className="text-xs text-muted-foreground">Loading...</span>
-                                  )}
-                                </label>
-                                <select
-                                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-                                  value={assigneeId}
-                                  onChange={(e) => setAssigneeId(e.target.value)}
-                                  disabled={loadingMembers || teamMembers.length === 0}
-                                >
-                                  <option value="">Unassigned</option>
-                                  {teamMembers.map((m) => (
-                                    <option key={m.id} value={m.id}>
-                                      {m.name} ({m.role || m.field})
                                     </option>
                                   ))}
                                 </select>

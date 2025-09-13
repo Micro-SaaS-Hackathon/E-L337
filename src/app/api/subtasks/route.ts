@@ -62,7 +62,37 @@ export async function GET(request: NextRequest) {
       throw subtasksError;
     }
 
-    return NextResponse.json({ subtasks: subtasks || [] });
+    // Get user profiles for assigned team members
+    let subtasksWithUsers = subtasks || [];
+    
+    if (subtasks && subtasks.length > 0) {
+      const assignedUserIds = subtasks
+        .filter(s => s.assigned_to)
+        .map(s => s.assigned_to);
+
+      if (assignedUserIds.length > 0) {
+        const { data: users, error: usersError } = await supabase.auth.admin.listUsers();
+        
+        if (!usersError && users) {
+          subtasksWithUsers = subtasks.map(subtask => {
+            if (subtask.assigned_to) {
+              const userProfile = users.users.find(u => u.id === subtask.assigned_to);
+              return {
+                ...subtask,
+                assigned_user: userProfile ? {
+                  id: userProfile.id,
+                  email: userProfile.email || 'Unknown',
+                  raw_user_meta_data: userProfile.user_metadata || {}
+                } : null
+              };
+            }
+            return subtask;
+          });
+        }
+      }
+    }
+
+    return NextResponse.json({ subtasks: subtasksWithUsers });
   } catch (error: any) {
     console.error('Error fetching subtasks:', error);
     return NextResponse.json(
@@ -162,7 +192,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { id, title, description, is_completed, position } = body;
+    const { id, title, description, is_completed, position, deadline, assigned_to } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Subtask ID is required' }, { status: 400 });
@@ -202,6 +232,8 @@ export async function PUT(request: NextRequest) {
     if (description !== undefined) updateData.description = description;
     if (is_completed !== undefined) updateData.is_completed = is_completed;
     if (position !== undefined) updateData.position = position;
+    if (deadline !== undefined) updateData.deadline = deadline;
+    if (assigned_to !== undefined) updateData.assigned_to = assigned_to;
 
     const { data: updatedSubtask, error: updateError } = await supabase
       .from('subtasks')

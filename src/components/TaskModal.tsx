@@ -9,6 +9,8 @@ import {
   Loader2,
   CheckSquare,
   Square,
+  User,
+  Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Pencil } from "lucide-react";
@@ -23,6 +25,20 @@ interface Subtask {
   is_completed: boolean;
   position: number;
   created_at: string;
+  assigned_to?: string;
+  assigned_user?: {
+    id: string;
+    email: string;
+    raw_user_meta_data?: {
+      full_name?: string;
+      field?: string;
+    };
+  };
+  deadline?: string;
+  status?: "todo" | "in-progress" | "completed";
+  priority?: "low" | "medium" | "high" | "urgent";
+  estimated_hours?: number;
+  actual_hours?: number;
 }
 
 interface Task {
@@ -68,6 +84,8 @@ export default function TaskModal({
   const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
   const [editSubtaskTitle, setEditSubtaskTitle] = useState("");
   const [editSubtaskDescription, setEditSubtaskDescription] = useState("");
+  const [editSubtaskDeadline, setEditSubtaskDeadline] = useState("");
+  const [editSubtaskAssignedTo, setEditSubtaskAssignedTo] = useState("");
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [isLoadingSubtasks, setIsLoadingSubtasks] = useState(false);
   const [isGeneratingSubtasks, setIsGeneratingSubtasks] = useState(false);
@@ -75,11 +93,13 @@ export default function TaskModal({
   const [newSubtaskDescription, setNewSubtaskDescription] = useState("");
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const [isDeletingTask, setIsDeletingTask] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
   const supabase = createClientComponentClient();
 
   useEffect(() => {
     if (isOpen) {
+      loadTeamMembers();
       loadSubtasks();
     }
   }, [isOpen, task.id]);
@@ -104,6 +124,40 @@ export default function TaskModal({
       console.error("Error loading subtasks:", error);
     } finally {
       setIsLoadingSubtasks(false);
+    }
+  };
+
+  const loadTeamMembers = async () => {
+    try {
+      const session = await supabase.auth.getSession();
+      if (!session?.data?.session) return;
+
+      // Get team members by first getting all tasks and finding our task's team_id
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('tasks')
+        .select('team_id')
+        .eq('id', task.id)
+        .single();
+
+      if (tasksError) {
+        console.error("Error getting task team_id:", tasksError);
+        return;
+      }
+
+      if (tasksData?.team_id) {
+        const membersResponse = await fetch(`/api/team-members?team_id=${tasksData.team_id}`, {
+          headers: {
+            Authorization: `Bearer ${session.data.session.access_token}`,
+          },
+        });
+
+        if (membersResponse.ok) {
+          const membersData = await membersResponse.json();
+          setTeamMembers(membersData.members || []);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading team members:", error);
     }
   };
 
@@ -268,6 +322,8 @@ export default function TaskModal({
     setEditingSubtaskId(subtask.id);
     setEditSubtaskTitle(subtask.title);
     setEditSubtaskDescription(subtask.description || "");
+    setEditSubtaskDeadline(subtask.deadline ? subtask.deadline.split('T')[0] : "");
+    setEditSubtaskAssignedTo(subtask.assigned_to || "");
   };
 
   // Save edited subtask
@@ -286,6 +342,8 @@ export default function TaskModal({
           id: subtaskId,
           title: editSubtaskTitle,
           description: editSubtaskDescription,
+          deadline: editSubtaskDeadline || null,
+          assigned_to: editSubtaskAssignedTo || null,
         }),
       });
       if (response.ok) {
@@ -296,6 +354,21 @@ export default function TaskModal({
                   ...st,
                   title: editSubtaskTitle,
                   description: editSubtaskDescription,
+                  deadline: editSubtaskDeadline || undefined,
+                  assigned_to: editSubtaskAssignedTo || undefined,
+                  assigned_user: editSubtaskAssignedTo 
+                    ? (() => {
+                        const member = teamMembers.find(m => m.id === editSubtaskAssignedTo);
+                        return member ? {
+                          id: member.id,
+                          email: member.email,
+                          raw_user_meta_data: {
+                            full_name: member.name,
+                            field: member.field,
+                          }
+                        } : undefined;
+                      })()
+                    : undefined,
                 }
               : st
           )
@@ -561,22 +634,58 @@ export default function TaskModal({
 
                     <div className="flex-1">
                       {editingSubtaskId === subtask.id ? (
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-2">
                           <input
                             className="font-medium text-sm text-foreground bg-background border border-input rounded px-2 py-1"
                             value={editSubtaskTitle}
                             onChange={(e) =>
                               setEditSubtaskTitle(e.target.value)
                             }
+                            placeholder="Subtask title"
                           />
                           <textarea
-                            className="text-xs mt-1 text-muted-foreground bg-background border border-input rounded px-2 py-1"
+                            className="text-xs text-muted-foreground bg-background border border-input rounded px-2 py-1"
                             value={editSubtaskDescription}
                             onChange={(e) =>
                               setEditSubtaskDescription(e.target.value)
                             }
+                            placeholder="Description (optional)"
                             rows={2}
                           />
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs text-muted-foreground mb-1">
+                                Deadline
+                              </label>
+                              <input
+                                type="date"
+                                className="text-xs bg-background border border-input rounded px-2 py-1 w-full"
+                                value={editSubtaskDeadline}
+                                onChange={(e) =>
+                                  setEditSubtaskDeadline(e.target.value)
+                                }
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-muted-foreground mb-1">
+                                Assigned to
+                              </label>
+                              <select
+                                className="text-xs bg-background border border-input rounded px-2 py-1 w-full"
+                                value={editSubtaskAssignedTo}
+                                onChange={(e) =>
+                                  setEditSubtaskAssignedTo(e.target.value)
+                                }
+                              >
+                                <option value="">Unassigned</option>
+                                {teamMembers.map((member) => (
+                                  <option key={member.id} value={member.id}>
+                                    {member.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
                           <div className="flex gap-2 mt-1">
                             <Button
                               variant="default"
@@ -605,12 +714,6 @@ export default function TaskModal({
                             }`}
                           >
                             {subtask.title}
-                            <button
-                              className="ml-2"
-                              onClick={() => startEditSubtask(subtask)}
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </button>
                           </h4>
                           {subtask.description && (
                             <p
@@ -623,18 +726,82 @@ export default function TaskModal({
                               {subtask.description}
                             </p>
                           )}
+                          
+                          {/* Assignment and deadline info */}
+                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                            {subtask.assigned_user && (
+                              <div className="flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                <span>
+                                  {subtask.assigned_user.raw_user_meta_data?.full_name ||
+                                    subtask.assigned_user.email?.split("@")[0] ||
+                                    "Unknown"}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {subtask.deadline && (
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                <span>
+                                  {new Date(subtask.deadline).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {subtask.priority && subtask.priority !== 'medium' && (
+                              <div className="flex items-center gap-1">
+                                <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                                  subtask.priority === 'high' || subtask.priority === 'urgent' 
+                                    ? 'bg-red-100 text-red-700' 
+                                    : subtask.priority === 'low'
+                                    ? 'bg-gray-100 text-gray-700'
+                                    : 'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {subtask.priority}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {subtask.status && subtask.status !== 'todo' && (
+                              <div className="flex items-center gap-1">
+                                <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                                  subtask.status === 'completed' 
+                                    ? 'bg-green-100 text-green-700' 
+                                    : subtask.status === 'in-progress'
+                                    ? 'bg-yellow-100 text-yellow-700'
+                                    : 'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {subtask.status}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </>
                       )}
                     </div>
 
-                    <Button
-                      onClick={() => deleteSubtask(subtask.id)}
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex flex-col gap-1">
+                      <Button
+                        onClick={() => deleteSubtask(subtask.id)}
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        onClick={() => startEditSubtask(subtask)}
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-primary"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
 

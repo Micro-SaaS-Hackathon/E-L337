@@ -114,27 +114,90 @@ Return only the JSON array, no additional text.
     try {
       const subtasks = JSON.parse(text);
       
-      // Create subtasks in the database
+      // Get team members for auto-assignment
+      const { data: teamMembers, error: membersError } = await supabase
+        .from('team_members')
+        .select(`
+          user_id,
+          role
+        `)
+        .eq('team_id', task.team_id);
+
+      if (membersError) {
+        throw membersError;
+      }
+
+      // Get user profiles for team members
+      const { data: users, error: usersError } = await supabase.auth.admin.listUsers();
+      
+      if (usersError) {
+        throw usersError;
+      }
+
+      const teamMembersWithProfiles = teamMembers.map(member => {
+        const userProfile = users.users.find(u => u.id === member.user_id);
+        return {
+          ...member,
+          profile: userProfile
+        };
+      });
+      
+      // Create subtasks in the database with auto-assignment
       const createdSubtasks = [];
+      const memberSubtaskCounts = teamMembersWithProfiles.map(() => 0);
+
       for (let i = 0; i < subtasks.length; i++) {
         const subtask = subtasks[i];
+        
+        // Auto-assign to team member using round-robin if we have team members
+        let assignedTo = null;
+        if (teamMembersWithProfiles.length > 0) {
+          const minSubtaskCount = Math.min(...memberSubtaskCounts);
+          const assigneeIndex = memberSubtaskCounts.findIndex(count => count === minSubtaskCount);
+          const assignee = teamMembersWithProfiles[assigneeIndex];
+          assignedTo = assignee.user_id;
+          memberSubtaskCounts[assigneeIndex]++;
+        }
+
+        // Calculate a reasonable deadline (3-7 days from now based on complexity)
+        const deadlineDate = new Date();
+        deadlineDate.setDate(deadlineDate.getDate() + Math.floor(Math.random() * 5) + 3); // 3-7 days
+
         const { data: createdSubtask, error: subtaskError } = await supabase
           .from('subtasks')
           .insert({
             task_id,
             title: subtask.title,
             description: subtask.description,
-            position: i
+            position: i,
+            assigned_to: assignedTo,
+            deadline: deadlineDate.toISOString(),
+            status: 'todo',
+            priority: 'medium'
           })
           .select()
           .single();
 
         if (!subtaskError && createdSubtask) {
+          // Create subtask assignment record if assigned
+          if (assignedTo) {
+            await supabase
+              .from('subtask_assignments')
+              .insert({
+                subtask_id: createdSubtask.id,
+                assigned_to: assignedTo,
+                assigned_by: user.id
+              });
+          }
+          
           createdSubtasks.push(createdSubtask);
         }
       }
 
-      return NextResponse.json({ subtasks: createdSubtasks });
+      return NextResponse.json({ 
+        subtasks: createdSubtasks,
+        message: `Generated ${createdSubtasks.length} subtasks and assigned them to team members`
+      });
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError);
       return NextResponse.json(
