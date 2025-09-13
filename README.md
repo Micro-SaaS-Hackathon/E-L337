@@ -1,5 +1,9 @@
 # E-L337 - AI-Powered Task Management Platform
 
+# PPT IS IN CLIPPY(3).pdf
+
+# in any case the link is https://pitch.com/v/clippy-q65wcs
+
 An intelligent task management application built with Next.js, Supabase, and Google Gemini AI. This platform helps teams organize tasks, generate subtasks automatically, and collaborate efficiently with AI assistance.
 
 ## Features
