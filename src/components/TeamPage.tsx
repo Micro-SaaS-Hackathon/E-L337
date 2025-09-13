@@ -15,6 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import TeamCalendar from "./TeamCalendar";
 
 interface Task {
   id: string;
@@ -562,6 +563,7 @@ export default function TeamPage({ team, onBack }: TeamPageProps) {
 
         {/* Calendar */}
         <div className="mb-8">
+          <TeamCalendar tasks={tasks} />
         </div>
 
         {/* Team Members */}
