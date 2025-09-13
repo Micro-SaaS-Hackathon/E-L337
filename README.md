@@ -4,6 +4,8 @@
 
 # in any case the link is https://pitch.com/v/clippy-q65wcs
 
+# https://e-l337-main.vercel.app/ project link (deployed)
+
 An intelligent task management application built with Next.js, Supabase, and Google Gemini AI. This platform helps teams organize tasks, generate subtasks automatically, and collaborate efficiently with AI assistance.
 
 ## Features
