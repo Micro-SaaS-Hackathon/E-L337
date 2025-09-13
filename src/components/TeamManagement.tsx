@@ -48,7 +48,6 @@ export default function TeamManagement() {
     try {
       setLoading(true);
 
-      // First, get the team memberships for the user
       const { data: memberships, error: membershipError } = await supabase
         .from("team_members")
         .select("team_id, role")
@@ -111,7 +110,7 @@ export default function TeamManagement() {
 
   if (selectedTeam) {
     return (
-      <TeamPage/>
+      <TeamPage team={selectedTeam} onBack={() => setSelectedTeam(null)} />
     );
   }
 
@@ -123,6 +122,7 @@ export default function TeamManagement() {
       return;
     }
 
+    // Validate required tech stack fields (only frontend and backend required)
     if (currentStep === "tech-stack") {
       console.log("Current tech stack:", techStack);
 

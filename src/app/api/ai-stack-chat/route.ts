@@ -6,10 +6,10 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function POST(req: NextRequest) {
   try {
-    const { message, conversation, currentStack } = await req.json();
+    const { message, conversation, currentStack, forceSuggestions } = await req.json();
 
     const systemPrompt = `
-    You are a friendly, expert tech stack consultant helping users choose the best technologies for their project. \n\nCurrent user's stack selections: ${JSON.stringify(currentStack || {}, null, 2)}\n\nInstructions:\n- Ask clarifying questions early.\n- Provide explanations with trade-offs.\n- End with a SUGGESTIONS array (plain text, JS-like) exactly in the format:\nSUGGESTIONS: [ {category: 'frontend', field: 'framework', value: 'nextjs', name: 'Next.js', rationale: 'Reason'}, ... ]\n- Include a full stack (frontend framework + styling, backend language + database, cloud provider).\n- Do not modify stack directly; only suggest.\n- Keep tone helpful & concise.`;
+    You are a friendly, expert tech stack consultant helping users choose the best technologies for their project. \n\nCurrent user's stack selections: ${JSON.stringify(currentStack || {}, null, 2)}\n\n${forceSuggestions ? 'IMPORTANT: The user has enabled "Force stack suggestions" mode. You MUST provide specific tech stack recommendations in EVERY response, regardless of the user\'s question. Always end your response with a SUGGESTIONS array.\n\n' : ''}Instructions:\n- Ask clarifying questions early.\n- Provide explanations with trade-offs.${forceSuggestions ? '\n- ALWAYS provide specific tech stack suggestions in EVERY response.' : ''}\n- End with a SUGGESTIONS array (plain text, JS-like) exactly in the format:\nSUGGESTIONS: [ {category: 'frontend', field: 'framework', value: 'nextjs', name: 'Next.js', rationale: 'Reason'}, ... ]\n- Include a full stack (frontend framework + styling, backend language + database, cloud provider).\n- Do not modify stack directly; only suggest.\n- Keep tone helpful & concise.`;
 
     const conversationContext = (conversation || [])
       .map((m: any) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)

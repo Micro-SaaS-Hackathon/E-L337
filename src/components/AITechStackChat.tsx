@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { TechStack } from "@/types/techStack";
 import { LucideFullscreen, Send } from "lucide-react";
 import { Button } from "./ui/Button";
+import { ToggleSwitch } from "./ui/ToggleSwitch";
 
 interface Message {
   role: "user" | "assistant";
@@ -165,6 +166,7 @@ export default function AITechStackChat({
   
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [forceSuggestions, setForceSuggestions] = useState(false);
   
   // Track if user has sent a custom message (not from quick start)
   const [showQuickStart, setShowQuickStart] = useState(() => {
@@ -363,7 +365,8 @@ export default function AITechStackChat({
       const bodyPayload = {
         message: actualMessage,
         conversation: messages.map(m => ({ role: m.role, content: m.content })),
-        currentStack
+        currentStack,
+        forceSuggestions
       };
 
       const res = await fetch('/api/ai-stack-chat', {
@@ -943,7 +946,7 @@ export default function AITechStackChat({
       )}
 
       {/* Input */}
-      <div className="border-t border-border/70 bg-background/80 backdrop-blur-md px-4 py-4">
+      <div className="border-t border-border/70 bg-background/80 backdrop-blur-md px-4 py-4 space-y-4">
         <div className="flex gap-2 items-center">
           <div className="relative flex-1 group/input">
             <textarea
@@ -968,6 +971,13 @@ export default function AITechStackChat({
             </div>
           </div>
         </div>
+        <ToggleSwitch
+          pressed={forceSuggestions}
+          onPressedChange={setForceSuggestions}
+          disabled={isLoading}
+          label="Force stack suggestions"
+          description="When enabled, AI will always include explicit tech stack recommendations in its reply."
+        />
       </div>
     </div>
     </>
