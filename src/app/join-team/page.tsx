@@ -1,11 +1,25 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-provider";
 import AuthForm from "@/components/AuthForm";
 import { useRouter } from "next/navigation";
 
 export default function JoinTeamPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center justify-center min-h-screen">
+          Loading...
+        </div>
+      }
+    >
+      <JoinTeamPageContent />
+    </Suspense>
+  );
+}
+
+function JoinTeamPageContent() {
   const searchParams = useSearchParams();
   const teamId = searchParams.get("teamId");
   const { user, session, loading } = useAuth();
