@@ -34,18 +34,6 @@ Create a `.env.local` file in the root directory and add the following environme
 
 Environment keys were intentionally added to simplify and streamline database usage.
 
-```env
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=https://kdgigafrsyjoaeyzzlky.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtkZ2lnYWZyc3lqb2FleXp6bGt5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0OTAwMTgsImV4cCI6MjA3MzA2NjAxOH0.hJRHQjcUCl5oWCZpOx4YbRjFJyrd8RFHbVQMbKU3THE
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtkZ2lnYWZyc3lqb2FleXp6bGt5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzQ5MDAxOCwiZXhwIjoyMDczMDY2MDE4fQ.bYnJWyb7iwsIHpnD09M6muCuL6LrdnOorbluDNeT7iE
-
-GEMINI_API_KEY=AIzaSyAwnHzr9cI6PUiLLicHf19538UtEwIIqkw
-
-# (Optional) Custom schema or other secrets
-# CUSTOM_SCHEMA=
-```
-
 ### How to get the environment variables:
 
 #### Supabase Setup:
